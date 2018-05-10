@@ -1,33 +1,33 @@
 #![feature(integer_atomics)]
 
-//! This is a library for Monte Carlo tree search. 
-//! 
+//! This is a library for Monte Carlo tree search.
+//!
 //! It is still under development and the documentation isn't good. However, the following example may be helpful:
 //!
 //! ```
 //! use mcts::*;
 //! use mcts::tree_policy::*;
 //! use mcts::transposition_table::*;
-//! 
+//!
 //! // A really simple game. There's one player and one number. In each move the player can
 //! // increase or decrease the number. The player's score is the number.
 //! // The game ends when the number reaches 100.
-//! // 
+//! //
 //! // The best strategy is to increase the number at every step.
 //!
 //! #[derive(Clone, Debug, PartialEq)]
 //! struct CountingGame(i64);
-//! 
+//!
 //! #[derive(Clone, Debug, PartialEq)]
 //! enum Move {
 //!     Add, Sub
 //! }
-//! 
+//!
 //! impl GameState for CountingGame {
 //!     type Move = Move;
 //!     type Player = ();
 //!     type MoveList = Vec<Move>;
-//! 
+//!
 //!     fn current_player(&self) -> Self::Player {
 //!         ()
 //!     }
@@ -46,18 +46,18 @@
 //!         }
 //!     }
 //! }
-//! 
+//!
 //! impl TranspositionHash for CountingGame {
 //!     fn hash(&self) -> u64 {
 //!         self.0 as u64
 //!     }
 //! }
-//! 
+//!
 //! struct MyEvaluator;
-//! 
+//!
 //! impl Evaluator<MyMCTS> for MyEvaluator {
 //!     type StateEvaluation = i64;
-//! 
+//!
 //!     fn evaluate_new_state(&self, state: &CountingGame, moves: &Vec<Move>,
 //!         _: Option<SearchHandle<MyMCTS>>)
 //!         -> (Vec<()>, i64) {
@@ -70,10 +70,10 @@
 //!         *evaln
 //!     }
 //! }
-//! 
+//!
 //! #[derive(Default)]
 //! struct MyMCTS;
-//! 
+//!
 //! impl MCTS for MyMCTS {
 //!     type State = CountingGame;
 //!     type Eval = MyEvaluator;
@@ -81,12 +81,13 @@
 //!     type ExtraThreadData = ();
 //!     type TreePolicy = UCTPolicy;
 //!     type TranspositionTable = ApproxTable<Self>;
-//! 
+//!     type PlayoutData = ();
+//!
 //!     fn cycle_behaviour(&self) -> CycleBehaviour<Self> {
 //!         CycleBehaviour::UseThisEvalWhenCycleDetected(0)
 //!     }
 //! }
-//! 
+//!
 //! let game = CountingGame(0);
 //! let mut mcts = MCTSManager::new(game, MyMCTS, MyEvaluator, UCTPolicy::new(0.5),
 //!     ApproxTable::new(1024));
@@ -169,12 +170,12 @@ pub trait MCTS: Sized + Sync {
     }
     /// Called when a child node is selected in a playout. The default implementation does nothing.
     fn on_choice_made<'a, 'b>(&self, _data: &mut Self::PlayoutData,
-        _state: &Self::State, _moves: Moves<'a, Self>, _choice: MoveInfoHandle<'a, Self>,
-        _handle: SearchHandle<'a, 'b, Self>) {}
-    /// Called before the tree policy is run. If it returns `Some(x)`, the tree policy is ignored 
+                              _state: &Self::State, _moves: Moves<'a, Self>, _choice: MoveInfoHandle<'a, Self>,
+                              _handle: SearchHandle<'a, 'b, Self>) {}
+    /// Called before the tree policy is run. If it returns `Some(x)`, the tree policy is ignored
     /// and `x` is used instead. The default implementation returns `None`.
     fn override_policy<'a>(&self, _data: &Self::PlayoutData,
-        _state: &Self::State, _moves: Moves<'a, Self>) -> Option<MoveInfoHandle<'a, Self>>
+                           _state: &Self::State, _moves: Moves<'a, Self>) -> Option<MoveInfoHandle<'a, Self>>
     { None }
 }
 
@@ -185,9 +186,9 @@ pub struct ThreadData<'a, Spec: MCTS> {
 }
 
 impl<'a, Spec: MCTS> ThreadData<'a, Spec>
-    where
-        TreePolicyThreadData<Spec>: Default,
-        Spec::ExtraThreadData: Default
+where
+    TreePolicyThreadData<Spec>: Default,
+    Spec::ExtraThreadData: Default
 {
     fn create(tree: &'a SearchTree<Spec>) -> Self {
         Self {
@@ -196,7 +197,7 @@ impl<'a, Spec: MCTS> ThreadData<'a, Spec>
             allocator: tree.arena().allocator(),
         }
     }
-} 
+}
 
 pub type MoveEvaluation<Spec> = <<Spec as MCTS>::TreePolicy as TreePolicy<Spec>>::MoveEvaluation;
 pub type StateEvaluation<Spec> = <<Spec as MCTS>::Eval as Evaluator<Spec>>::StateEvaluation;
@@ -219,17 +220,17 @@ pub trait Evaluator<Spec: MCTS>: Sync {
     type StateEvaluation: Sync + Send;
 
     fn evaluate_new_state(&self,
-        state: &Spec::State, moves: &MoveList<Spec>,
-        handle: Option<SearchHandle<Spec>>)
-        -> (Vec<MoveEvaluation<Spec>>, Self::StateEvaluation);
+                          state: &Spec::State, moves: &MoveList<Spec>,
+                          handle: Option<SearchHandle<Spec>>)
+                          -> (Vec<MoveEvaluation<Spec>>, Self::StateEvaluation);
 
     fn evaluate_existing_state(&self, state: &Spec::State, existing_evaln: &Self::StateEvaluation,
-        handle: SearchHandle<Spec>)
-        -> Self::StateEvaluation;
+                               handle: SearchHandle<Spec>)
+                               -> Self::StateEvaluation;
 
     fn interpret_evaluation_for_player(&self,
-        evaluation: &Self::StateEvaluation,
-        player: &Player<Spec>) -> i64;
+                                       evaluation: &Self::StateEvaluation,
+                                       player: &Player<Spec>) -> i64;
 }
 
 
@@ -239,12 +240,12 @@ pub struct MCTSManager<Spec: MCTS> {
 }
 
 impl<Spec: MCTS> MCTSManager<Spec>
-    where
-        TreePolicyThreadData<Spec>: Default,
-        Spec::ExtraThreadData: Default
+where
+    TreePolicyThreadData<Spec>: Default,
+    Spec::ExtraThreadData: Default
 {
     pub fn new(state: Spec::State, manager: Spec, eval: Spec::Eval, tree_policy: Spec::TreePolicy,
-            table: Spec::TranspositionTable) -> Self {
+               table: Spec::TranspositionTable) -> Self {
         let search_tree = SearchTree::new(state, manager, tree_policy, eval, table);
         Self {search_tree, print_on_playout_error: true}
     }
@@ -278,7 +279,7 @@ impl<Spec: MCTS> MCTSManager<Spec>
                 if !search_tree.playout(&mut tld) {
                     if print_on_playout_error {
                         eprintln!("Node limit of {} reached. Halting search.",
-                            search_tree.spec().node_limit());
+                                  search_tree.spec().node_limit());
                     }
                     break;
                 }
@@ -354,7 +355,7 @@ impl<Spec: MCTS> MCTSManager<Spec>
             .collect()
     }
     pub fn principal_variation_states(&self, num_moves: usize)
-            -> Vec<Spec::State> {
+                                      -> Vec<Spec::State> {
         let moves = self.principal_variation(num_moves);
         let mut states = vec![self.search_tree.root_state().clone()];
         for mov in moves {
