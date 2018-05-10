@@ -37,5 +37,5 @@ cargo build --release --all
 If you don't have it, you can get it by
 [installing Rust](https://www.rust-lang.org/en-US/install.html).
 
-This should produce an executable in `target/release/sashimi`
+This should produce an executable `target/release/sashimi`
 whose path you can provide to your GUI in order to play against Sashimi.
