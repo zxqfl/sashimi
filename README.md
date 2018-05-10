@@ -10,7 +10,7 @@ not use rollouts.
 However, Sashimi is unlike AlphaZero in that Sashimi uses linear models
 for move selection and position evaluation rather than deep learning.
 Sashimi also does not use reinforcement learning: the models are obtained by
-training on a large dataset of human games from Lichess.
+training on a large dataset of human games from [Lichess](https://lichess.org/).
 
 ## How to play against Sashimi
 
