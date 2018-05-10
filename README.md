@@ -17,7 +17,8 @@ training on a large dataset of human games from [Lichess](https://lichess.org/).
 Sashimi implements the UCI protocol, so you can use it with any chess GUI that speaks UCI.
 I used [PyChess](http://pychess.org/) to test Sashimi.
 
-You will need to build Sashimi in order to play against it:
+You will need to build Sashimi in order to play against it.
+**Sashimi requires nightly Rust.**
 ```
 git clone https://github.com/zxqfl/sashimi
 cd sashimi
