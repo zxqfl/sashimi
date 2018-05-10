@@ -12,7 +12,7 @@ for move selection and position evaluation rather than deep learning.
 Sashimi also does not use reinforcement learning: the models are obtained by
 training on a large dataset of human games from Lichess.
 
-# How to play against Sashimi
+## How to play against Sashimi
 
 Sashimi implements the UCI protocol, so you can use it with any chess GUI that speaks UCI.
 I used [PyChess](http://pychess.org/) to test Sashimi.
@@ -23,5 +23,9 @@ git clone https://github.com/zxqfl/sashimi
 cd sashimi
 cargo build --release --all
 ```
+`cargo` is the Rust package manager.
+If you don't have it, you can get it by
+[installing Rust](https://www.rust-lang.org/en-US/install.html).
+
 This should produce an executable in `target/release/sashimi`
 whose path you can provide to your GUI in order to play against Sashimi.
