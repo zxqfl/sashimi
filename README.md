@@ -14,12 +14,12 @@ training on a large dataset of human games from [Lichess](https://lichess.org/).
 
 ## Example game
 
-This is a game where I (~1400 Elo) play white against Sashimi. Sashimi ran on my laptop with
+This is a game where I (~1400 Elo) play white against Sashimi, which plays black. Sashimi ran on my laptop with
 10s per move. On my laptop this is equivalent to about 2 million playouts per move.
 
 ![Example game](example_game.gif "Jacob Jackson vs. Sashimi")
 
-**Jacob Jackson vs Sashimi** ([PGN](example_game.pgn))
+**Jacob Jackson vs Sashimi, 0-1** ([PGN](example_game.pgn))
 
 ## How to play against Sashimi
 
