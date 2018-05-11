@@ -1,5 +1,5 @@
 extern crate slurp;
-use slurp::*;
+use self::slurp::*;
 
 use std::env;
 use std::fs::File;
@@ -47,10 +47,8 @@ fn build_value() {
         write!(f, "    \"{}\",\n", x).unwrap();
     }
     write!(f, "];\n").unwrap();
-    write!(f, "const NUM_MODEL_FEATURES: usize = {};\n",
-        read_all_lines("model").unwrap().len()).unwrap();
-    write!(f, "const COEF: [[f32; NUM_OUTCOMES]; NUM_MODEL_FEATURES] = {};\n",
-        read_all_to_string("model").unwrap()).unwrap();
+    write!(f, "pub const NUM_MODEL_FEATURES: usize = {};\n",
+           read_all_lines("model").unwrap().len()).unwrap();
 }
 
 fn build_policy() {
@@ -67,10 +65,10 @@ fn build_policy() {
         write!(f, "    \"{}\",\n", x).unwrap();
     }
     write!(f, "];\n").unwrap();
-    write!(f, "const NUM_MODEL_FEATURES: usize = {};\n",
-        read_all_lines("policy_model").unwrap().len()).unwrap();
-    write!(f, "const COEF: [f32; NUM_MODEL_FEATURES] = {};\n",
-        read_all_to_string("policy_model").unwrap()).unwrap();
+    // write!(f, "const NUM_MODEL_FEATURES: usize = {};\n",
+    //        read_all_lines("policy_model").unwrap().len()).unwrap();
+    // write!(f, "const COEF: [f32; NUM_MODEL_FEATURES] = {};\n",
+    //        read_all_to_string("policy_model").unwrap()).unwrap();
 }
 
 fn write_feature_names(from: &str, f: &mut File, offset: &str) -> Vec<String> {
@@ -94,10 +92,10 @@ fn exempt(name: &str) -> bool {
         false
     } else {
         name.contains("KNIGHT") ||
-        name.contains("BISHOP") ||
-        name.contains("ROOK") ||
-        name.contains("QUEEN") ||
-        name.contains("KING")
+            name.contains("BISHOP") ||
+            name.contains("ROOK") ||
+            name.contains("QUEEN") ||
+            name.contains("KING")
     }
 }
 

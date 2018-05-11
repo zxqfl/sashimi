@@ -1,9 +1,4 @@
-use chess::*;
-use state::State;
-use std::io::Write;
-use std::cmp::min;
-
-use features_common::*;
+use import::*;
 
 include!(concat!(env!("OUT_DIR"), "/feature_const.rs"));
 const MAX_PATTERNS_IN_POSITION: usize = 64 + 7*7;
@@ -67,7 +62,7 @@ pub enum GameResult {
     BlackWin,
     Draw,
 }
-const NUM_OUTCOMES: usize = 3;
+pub const NUM_OUTCOMES: usize = 3;
 impl GameResult {
     pub fn flip(&self) -> Self {
         match *self {
@@ -80,27 +75,27 @@ impl GameResult {
 
 impl FeatureVec {
     pub fn write_libsvm<W: Write, Pred: Fn(usize) -> bool>
-            (&mut self, f: &mut W, label: usize, whitelist: Pred) {
-        write!(f, "{}", label).unwrap();
-        for (index, value) in self.arr.iter().enumerate() {
-            if *value != 0 && whitelist(index) {
-                write!(f, " {}:{}", index + 1, value).unwrap();
-            }
-        }
-        self.patterns.sort();
-        let mut cnt = 0;
-        for i in 0..self.patterns.len() {
-            let x = self.patterns[i];
-            cnt += 1;
-            if i + 1 == self.patterns.len() || x != self.patterns[i + 1] {
-                if whitelist(x) {
-                    write!(f, " {}:{}", x + 1, cnt).unwrap();
+        (&mut self, mut f: W, label: usize, whitelist: Pred) {
+            write!(f, "{}", label).unwrap();
+            for (index, value) in self.arr.iter().enumerate() {
+                if *value != 0 && whitelist(index) {
+                    write!(f, " {}:{}", index + 1, value).unwrap();
                 }
-                cnt = 0;
             }
+            self.patterns.sort();
+            let mut cnt = 0;
+            for i in 0..self.patterns.len() {
+                let x = self.patterns[i];
+                cnt += 1;
+                if i + 1 == self.patterns.len() || x != self.patterns[i + 1] {
+                    if whitelist(x) {
+                        write!(f, " {}:{}", x + 1, cnt).unwrap();
+                    }
+                    cnt = 0;
+                }
+            }
+            write!(f, "\n").unwrap();
         }
-        write!(f, "\n").unwrap();
-    }
     pub fn write_frequency(&self, freq: &mut [u64; NUM_FEATURES]) {
         for (index, &value) in self.arr.iter().enumerate() {
             freq[index] += value as u64;
@@ -220,10 +215,10 @@ fn foreach_feature<F>(state: &State, _: &[ChessMove], mut f: F) where F: FnMut(u
         for &piece in all_pieces {
             for sq in board.pieces(piece) & color_board {
                 for &is_rank in &[false, true] {
-                    if piece != Piece::Pawn && piece != Piece::Rook && piece != Piece::King && 
-                            is_rank && sq.get_rank() != Rank::First && sq.get_rank() != Rank::Eighth  {
-                        continue;
-                    }
+                    if piece != Piece::Pawn && piece != Piece::Rook && piece != Piece::King &&
+                        is_rank && sq.get_rank() != Rank::First && sq.get_rank() != Rank::Eighth  {
+                            continue;
+                        }
                     if piece != Piece::Pawn && piece != Piece::King && piece != Piece::Knight && !is_rank {
                         continue;
                     }
@@ -264,39 +259,31 @@ pub fn featurize(state: &State, moves: &[ChessMove]) -> FeatureVec {
     }
 }
 
-pub struct Model;
-
-impl Model {
-    pub fn new() -> Self {
-        Model
-    }
-    pub fn predict(&self, state: &State, moves: &[ChessMove]) -> [f32; NUM_OUTCOMES] {
-        let mut result = [0f32; NUM_OUTCOMES];
-        foreach_feature(state, moves, |i, _| {
-            if i < NUM_MODEL_FEATURES {
-                for j in 0..NUM_OUTCOMES {
-                    // result[j] += COEF[i][j] * (v as f32);
-                    result[j] += COEF[i][j];
-                }
+pub fn predict(state: &State, moves: &[ChessMove], model: &Model) -> [f32; NUM_OUTCOMES] {
+    let mut result = [0f32; NUM_OUTCOMES];
+    foreach_feature(state, moves, |i, _| {
+        if i < NUM_MODEL_FEATURES {
+            for j in 0..NUM_OUTCOMES {
+                result[j] += model.value_coef[i][j];
             }
-        });
-        for x in &mut result {
-            *x = x.exp();
         }
-        let s = 1.0 / result.iter().sum::<f32>();
-        for x in &mut result {
-            *x *= s;
-        }
-        if state.board().side_to_move() == Color::Black {
-            result.swap(0, 1);
-        }
-        result
+    });
+    for x in &mut result {
+        *x = x.exp();
     }
-    pub fn score(&self, state: &State, moves: &[ChessMove]) -> f32 {
-        let probs = self.predict(state, moves);
-          probs[GameResult::WhiteWin as usize]
+    let s = 1.0 / result.iter().sum::<f32>();
+    for x in &mut result {
+        *x *= s;
+    }
+    if state.board().side_to_move() == Color::Black {
+        result.swap(0, 1);
+    }
+    result
+}
+pub fn score(state: &State, moves: &[ChessMove], model: &Model) -> f32 {
+    let probs = predict(state, moves, model);
+    probs[GameResult::WhiteWin as usize]
         - probs[GameResult::BlackWin as usize]
-    }
 }
 
 fn phase(s: &State) -> Phase {

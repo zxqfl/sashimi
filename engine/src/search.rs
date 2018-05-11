@@ -1,18 +1,8 @@
-use mcts::{MCTS, MCTSManager, AsyncSearchOwned, CycleBehaviour};
-use mcts::tree_policy::AlphaGoPolicy;
-use mcts::transposition_table::ApproxTable;
-use state::{State, Move};
-use std::sync::mpsc::Sender;
-use std::thread;
-use std::time::Duration;
-use std::cmp::max;
-use uci::{TIMEUP, Tokens};
-use evaluation::GooseEval;
-use features::Model;
-use args::options;
-use chess::Piece;
+use import::*;
 
 const DEFAULT_MOVE_TIME_SECS: u64 = 10;
+
+pub const TIMEUP: &'static str = "timeup";
 
 pub const SCALE: f32 = 1e9;
 
@@ -21,7 +11,7 @@ fn policy() -> AlphaGoPolicy {
 }
 
 fn num_threads() -> usize {
-    max(1, options().num_threads)
+    1
 }
 
 pub struct GooseMCTS;
@@ -29,13 +19,13 @@ pub struct ThreadSentinel;
 
 impl Default for ThreadSentinel {
     fn default() -> Self {
-        info!("Search thread created.");
+        // info!("Search thread created.");
         ThreadSentinel
     }
 }
 impl Drop for ThreadSentinel {
     fn drop(&mut self) {
-        info!("Search thread destroyed.");
+        // info!("Search thread destroyed.");
     }
 }
 
@@ -64,16 +54,16 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn create_manager(state: State) -> MCTSManager<GooseMCTS> {
+    pub fn create_manager(state: State, model: Model) -> MCTSManager<GooseMCTS> {
         MCTSManager::new(
             state.freeze(),
             GooseMCTS,
-            GooseEval::from(Model::new()),
+            GooseEval::from(model),
             policy(),
             ApproxTable::enough_to_hold(GooseMCTS.node_limit()))
     }
     pub fn new(state: State) -> Self {
-        let search = Self::create_manager(state).into();
+        let search = Self::create_manager(state, Model::default()).into();
         Self {search}
     }
     fn stop_and_print_m(self) -> MCTSManager<GooseMCTS> {
@@ -101,7 +91,11 @@ impl Search {
             search: self.stop_and_print_m().into()
         }
     }
-    pub fn go(self, mut tokens: Tokens, position_num: u64, sender: &Sender<String>) -> Self {
+    pub fn go<'a>(self,
+                  mut tokens: impl Iterator<Item=&'a str>,
+                  position_num: u64,
+                  sender: &Sender<String>)
+                  -> Self {
         let manager = self.stop_and_print_m();
         let mut think_time = Some(Duration::from_secs(DEFAULT_MOVE_TIME_SECS));
         while let Some(s) = tokens.next() {

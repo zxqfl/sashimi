@@ -1,7 +1,4 @@
-use features::FeatureVec;
-use state::{State, Move};
-use chess::*;
-use features_common::*;
+use import::*;
 
 include!(concat!(env!("OUT_DIR"), "/policy_feature_const.rs"));
 const NUM_ADVS: usize = 5;
@@ -116,15 +113,15 @@ fn foreach_feature<F>(state: &State, mov: &Move, mut f: F) where F: FnMut(usize,
     let f_src = mov.get_source().get_file();
     let f_dst = mov.get_dest().get_file();
     if our_role == Piece::King &&
-            f_src != f_dst.left() &&
-            f_src != f_dst &&
-            f_src != f_dst.right() {
-        if f_src.to_index() < f_dst.to_index() {
-            f(CASTLE_LONG);
-        } else {
-            f(CASTLE_SHORT);
+        f_src != f_dst.left() &&
+        f_src != f_dst &&
+        f_src != f_dst.right() {
+            if f_src.to_index() < f_dst.to_index() {
+                f(CASTLE_LONG);
+            } else {
+                f(CASTLE_SHORT);
+            }
         }
-    }
     if our_role == Piece::Pawn {
         let src_rank = rank_from_side(board.side_to_move(), mov.get_source());
         let dst_rank = rank_from_side(board.side_to_move(), mov.get_dest());
@@ -166,17 +163,17 @@ pub fn featurize(state: &State, mov: &Move) -> FeatureVec {
     }
 }
 
-fn evaluate_single(state: &State, mov: &Move) -> f32 {
+fn evaluate_single(state: &State, mov: &Move, model: &Model) -> f32 {
     let mut result = 0f32;
     foreach_feature(state, mov, |i, _| {
-        result += COEF[i];
+        result += model.policy_coef[i];
     });
     result
 }
 
-pub fn evaluate_moves(state: &State, moves: &[Move]) -> Vec<f32> {
+pub fn evaluate_moves(state: &State, moves: &[Move], model: &Model) -> Vec<f32> {
     let mut evalns: Vec<_> = moves.iter()
-        .map(|x| evaluate_single(state, x))
+        .map(|x| evaluate_single(state, x, model))
         .collect();
     softmax(&mut evalns);
     evalns
@@ -215,7 +212,7 @@ pub fn name_feature(idx: usize) -> String {
 
 fn get_advantage(state: &State, occ: BitBoard, to: Square) -> i32 {
     let board = state.board();
-    
+
     let b = get_bishop_moves(to, occ);
     let r = get_rook_moves(to, occ);
     let n = get_knight_moves(to);

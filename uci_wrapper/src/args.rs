@@ -7,13 +7,10 @@ pub struct Options {
     pub train_output_path: String,
     pub policy: bool,
     pub extra: Vec<String>,
-    pub num_threads: usize,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        extern crate num_cpus;
-        let num_threads = num_cpus::get();
         Options {
             log_file_path: "sashimi.log".into(),
             train_pgn: None,
@@ -37,8 +34,6 @@ pub fn init() {
             .add_option(&["-p", "--policy"], StoreTrue, "output policy data instead of value data");
         ap.refer(&mut options.log_file_path)
             .add_option(&["--log"], Store, "log file path");
-        ap.refer(&mut options.num_threads)
-            .add_option(&["--threads"], Store, "number of threads");
         ap.refer(&mut options.extra)
             .add_argument("uci_commands", Collect, "additional arguments are interpreted as UCI commands");
         ap.parse_args_or_exit();

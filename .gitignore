@@ -5,6 +5,7 @@ lichess*.pgn
 engine/games/*
 *.libsvm
 train_data*
+data*
 *.sqlite
 old-versions/*
 *_features.txt

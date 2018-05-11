@@ -4,6 +4,8 @@ members = [
     "engine",
     "mcts",
     "arena",
+    "uci_wrapper",
+    "selfplay",
 ]
 
 [profile.release]

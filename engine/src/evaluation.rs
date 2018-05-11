@@ -1,9 +1,4 @@
-use mcts::{Evaluator, SearchHandle};
-use search::{GooseMCTS, SCALE};
-use state::{State, Player, MoveList};
-use features::Model;
-use policy_features::evaluate_moves;
-use chess::*;
+use import::*;
 
 pub struct GooseEval {
     model: Model
@@ -14,7 +9,7 @@ impl Evaluator<GooseMCTS> for GooseEval {
 
     fn evaluate_new_state(&self, state: &State, moves: &MoveList,
                           _: Option<SearchHandle<GooseMCTS>>) -> (Vec<f32>, i64) {
-        let move_evaluations = evaluate_moves(state, moves.as_slice());
+        let move_evaluations = evaluate_moves(state, moves.as_slice(), &self.model);
         let state_evaluation = if moves.len() == 0 {
             let x = SCALE as i64;
             match state.outcome() {
@@ -24,7 +19,7 @@ impl Evaluator<GooseMCTS> for GooseEval {
                 BoardStatus::Ongoing => unreachable!(),
             }
         } else {
-            (self.model.score(state, moves.as_slice()) * SCALE as f32) as i64
+            (features::score(state, moves.as_slice(), &self.model) * SCALE as f32) as i64
         };
         (move_evaluations, state_evaluation)
     }
@@ -58,13 +53,13 @@ mod tests {
         let state = State::from_fen(fen).unwrap();
         let moves = state.available_moves();
         let moves = moves.as_slice();
-        let evalns = evaluate_moves(&state, &moves);
+        let evalns = evaluate_moves(&state, &moves, &Model::default());
         let mut paired: Vec<_> = moves.iter().zip(evalns.iter()).collect();
         paired.sort_by_key(|x| FloatOrd(*x.1));
         for (a, b) in paired {
             println!("policy: {} {}", a, b);
         }
-        let mut manager = Search::create_manager(state);
+        let mut manager = Search::create_manager(state, Model::default());
         // for _ in 0..5 {
         manager.playout_n(1_000_000);
         println!("\n\nMOVES");
@@ -87,11 +82,13 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(debug_assertions))]
     fn mate_in_one() {
         assert_find_move("6k1/8/6K1/8/8/8/8/R7 w - - 0 0", "a1-a8");;
     }
 
     #[test]
+    #[cfg(not(debug_assertions))]
     fn mate_in_six() {
         assert_find_move("5q2/6Pk/8/6K1/8/8/8/8 w - - 0 0", "g7-f8=R");
     }

@@ -1,7 +1,6 @@
 use smallvec::SmallVec;
 use mcts::GameState;
 use mcts::transposition_table::TranspositionHash;
-use uci::Tokens;
 use shakmaty;
 use shakmaty::Position;
 use chess;
@@ -30,11 +29,11 @@ impl StateBuilder {
     }
     pub fn from_fen(fen: &str) -> Option<Self> {
         Some(fen
-            .parse::<shakmaty::fen::Fen>().ok()?
-            .position::<shakmaty::Chess>().ok()?
-            .into())
+             .parse::<shakmaty::fen::Fen>().ok()?
+             .position::<shakmaty::Chess>().ok()?
+             .into())
     }
-    pub fn from_tokens(mut tokens: Tokens) -> Option<Self> {
+    pub fn from_tokens<'a>(mut tokens: impl Iterator<Item=&'a str>) -> Option<Self> {
         let mut result = match tokens.next()? {
             "startpos" => Self::default(),
             "fen" => {
@@ -82,7 +81,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn from_tokens(tokens: Tokens) -> Option<Self> {
+    pub fn from_tokens<'a>(tokens: impl Iterator<Item=&'a str>) -> Option<Self> {
         StateBuilder::from_tokens(tokens).map(|x| x.into())
     }
     #[cfg(test)]
@@ -111,9 +110,9 @@ impl State {
     fn check_for_repetition(&mut self) {
         let crnt_hash = self.board.get_hash();
         self.repetitions = max(self.repetitions,
-            self.prev_state_hashes.iter()
-                .filter(|h| **h == crnt_hash)
-                .count());
+                               self.prev_state_hashes.iter()
+                               .filter(|h| **h == crnt_hash)
+                               .count());
     }
     fn drawn_by_repetition(&self) -> bool {
         self.repetitions >= 2
@@ -220,8 +219,8 @@ impl From<StateBuilder> for State {
         for mov in sb.moves {
             let mov = convert_move(&mov);
             assert!(state.board().legal(mov),
-                "{} is illegal on the following board:\n{}",
-                mov, state.board());
+                    "{} is illegal on the following board:\n{}",
+                    mov, state.board());
             state.make_move(&mov);
         }
         state
