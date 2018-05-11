@@ -1,9 +1,9 @@
 use std::io::{stdin, BufRead};
 use search::Search;
 use state::State;
-use std::str::SplitWhitespace;
 use std::sync::mpsc::{SendError, channel};
 use std::thread;
+use engine;
 
 const ENGINE_NAME: &'static str = "Sashimi";
 const ENGINE_AUTHOR: &'static str = "Jacob Jackson";
@@ -46,7 +46,7 @@ pub fn main(commands: Vec<String>) {
                     }
                 },
                 "stop"       => search = search.stop_and_print(),
-                TIMEUP       => {
+                x if x == engine::search::TIMEUP       => {
                     let old_position_num = tokens.next().and_then(|x| x.parse().ok()).unwrap_or(0);
                     if position_num == old_position_num {
                         search = search.stop_and_print();

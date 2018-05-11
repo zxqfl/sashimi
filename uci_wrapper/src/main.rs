@@ -1,3 +1,8 @@
+#[macro_use] extern crate log;
+extern crate simplelog;
+extern crate shakmaty;
+extern crate chess;
+extern crate mcts;
 extern crate engine;
 pub use engine::*;
 

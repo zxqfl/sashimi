@@ -5,14 +5,18 @@ authors = ["Jacob Jackson <jacobbfjackson@gmail.com>"]
 
 [dependencies]
 engine = { path = "../engine" }
+mcts = { path = "../mcts" }
 argparse = "*"
 log = "*"
+shakmaty = "*"
+chess = "*"
 madvise = "*"
 memmap = "*"
 num_cpus = "*"
 pgn-reader = "0.4.0"
 simplelog = "*"
 slurp = "*"
+rand = "*"
 
 [[bin]]
 name = "sashimi"

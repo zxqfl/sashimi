@@ -17,7 +17,6 @@ impl Default for Options {
             train_output_path: "train_data.libsvm".into(),
             policy: false,
             extra: Vec::new(),
-            num_threads,
         }
     }
 }

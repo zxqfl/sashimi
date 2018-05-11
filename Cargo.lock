@@ -550,12 +550,16 @@ name = "uci_wrapper"
 version = "0.2.0"
 dependencies = [
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chess 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "engine 0.2.0",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "madvise 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mcts 0.2.0",
  "memmap 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pgn-reader 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shakmaty 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "simplelog 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "slurp 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
