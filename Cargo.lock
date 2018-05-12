@@ -198,6 +198,13 @@ version = "0.2.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "linear_regression"
+version = "0.1.0"
+dependencies = [
+ "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "log"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

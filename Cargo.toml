@@ -6,6 +6,7 @@ members = [
     "arena",
     "uci_wrapper",
     "selfplay",
+    "linear_regression",
 ]
 
 [profile.release]

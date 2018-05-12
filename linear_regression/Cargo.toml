@@ -1,0 +1,7 @@
+[package]
+authors = ["Jacob Jackson <jacobbfjackson@gmail.com>"]
+name = "linear_regression"
+version = "0.1.0"
+
+[dependencies]
+rand = "0.4"
