@@ -20,7 +20,7 @@ pub struct SearchTree<Spec: MCTS> {
     root_state: Spec::State,
     tree_policy: Spec::TreePolicy,
     table: Spec::TranspositionTable,
-    eval: Spec::Eval,
+    pub eval: Spec::Eval,
     manager: Spec,
     arena: Box<Arena>,
 
@@ -82,7 +82,7 @@ pub struct MoveInfoHandle<'a, Spec: 'a + MCTS> {
 
 unsafe impl<Spec: MCTS> Pod for HotMoveInfo<Spec> {}
 unsafe impl<Spec: MCTS> Pod for ColdMoveInfo<Spec> {}
-unsafe impl<Spec: MCTS> Pod for SearchNode<Spec> {}
+unsafe impl<Spec: MCTS> Pod for SearchNode<Spec> where Spec::NodeData: Pod {}
 
 impl<'a, Spec: MCTS> Clone for MoveInfoHandle<'a, Spec> {
     fn clone(&self) -> Self {
@@ -101,23 +101,24 @@ pub struct SearchNode<Spec: MCTS> {
 }
 
 unsafe impl<Spec: MCTS> Sync for SearchNode<Spec>
-    where
-        Spec::NodeData: Sync,
-        StateEvaluation<Spec>: Sync,
-        // NodeStats: Sync,
-        // for<'a> &'a[HotMoveInfo<Spec>]: Sync,
-        // for<'a> &'a[ColdMoveInfo<Spec>]: Sync,
+where
+    Spec::NodeData: Sync,
+StateEvaluation<Spec>: Sync,
+// NodeStats: Sync,
+// for<'a> &'a[HotMoveInfo<Spec>]: Sync,
+// for<'a> &'a[ColdMoveInfo<Spec>]: Sync,
 {}
 
 impl<Spec: MCTS> SearchNode<Spec> {
     fn new<'a>(
-            hots: &'a [HotMoveInfo<Spec>],
-            colds: &'a [ColdMoveInfo<Spec>],
-            evaln: StateEvaluation<Spec>) -> Self {
+        hots: &'a [HotMoveInfo<Spec>],
+        colds: &'a [ColdMoveInfo<Spec>],
+        evaln: StateEvaluation<Spec>,
+        data: Spec::NodeData) -> Self {
         Self {
             hots: hots as *const _ as *const [()],
             colds: colds as *const _ as *const [()],
-            data: Default::default(),
+            data,
             evaln,
             visits: FakeU32::default(),
             sum_evaluations: AtomicI64::default(),
@@ -201,13 +202,13 @@ impl<'a, Spec: MCTS> Display for MoveInfoHandle<'a, Spec> where Move<Spec>: Disp
         };
         if self.visits() == 0 {
             write!(f, "{} [0 visits]{}",
-                self.get_move(),
-                own_str)
+                   self.get_move(),
+                   own_str)
         } else {
             write!(f, "{} [{} visit{}] [{} avg reward]{}",
-                self.get_move(), self.visits(), if self.visits() == 1 {""} else {"s"},
-                self.sum_rewards() as f64 / self.visits() as f64,
-                own_str)
+                   self.get_move(), self.visits(), if self.visits() == 1 {""} else {"s"},
+                   self.sum_rewards() as f64 / self.visits() as f64,
+                   own_str)
         }
     }
 }
@@ -221,13 +222,13 @@ impl<'a, Spec: MCTS> Debug for MoveInfoHandle<'a, Spec> where Move<Spec>: Debug 
         };
         if self.visits() == 0 {
             write!(f, "{:?} [0 visits]{}",
-                self.get_move(),
-                own_str)
+                   self.get_move(),
+                   own_str)
         } else {
             write!(f, "{:?} [{} visit{}] [{} avg reward]{}",
-                self.get_move(), self.visits(), if self.visits() == 1 {""} else {"s"},
-                self.sum_rewards() as f64 / self.visits() as f64,
-                own_str)
+                   self.get_move(), self.visits(), if self.visits() == 1 {""} else {"s"},
+                   self.sum_rewards() as f64 / self.visits() as f64,
+                   own_str)
         }
     }
 }
@@ -239,8 +240,8 @@ enum CreationHelper<'a: 'b, 'b, Spec: 'a + MCTS> {
 
 #[inline(always)]
 fn create_node<'a, 'b, 'c, Spec: MCTS>(eval: &Spec::Eval, policy: &Spec::TreePolicy, state: &Spec::State,
-        ch: CreationHelper<'a, 'b, Spec>)
-        -> SearchNode<Spec> {
+                                       ch: CreationHelper<'a, 'b, Spec>)
+                                       -> SearchNode<Spec> {
     let (allocator, handle) = match ch {
         CreationHelper::Allocator(x) => (x, None),
         CreationHelper::Handle(x) => {
@@ -251,7 +252,7 @@ fn create_node<'a, 'b, 'c, Spec: MCTS>(eval: &Spec::Eval, policy: &Spec::TreePol
         }
     };
     let moves = state.available_moves();
-    let (move_eval, state_eval) = eval.evaluate_new_state(&state, &moves, handle);
+    let (move_eval, state_eval, node_data) = eval.evaluate_new_state(&state, &moves, handle);
     policy.validate_evaluations(&move_eval);
     let hots = allocator.alloc_slice(move_eval.len());
     let colds = allocator.alloc_slice(move_eval.len());
@@ -261,7 +262,7 @@ fn create_node<'a, 'b, 'c, Spec: MCTS>(eval: &Spec::Eval, policy: &Spec::TreePol
     for (x, y) in colds.iter_mut().zip(moves.into_iter()) {
         *x = ColdMoveInfo::new(y);
     }
-    SearchNode::new(hots, colds, state_eval)
+    SearchNode::new(hots, colds, state_eval, node_data)
 }
 
 fn is_cycle<T>(past: &[&T], current: &T) -> bool {
@@ -270,7 +271,7 @@ fn is_cycle<T>(past: &[&T], current: &T) -> bool {
 
 impl<Spec: MCTS> SearchTree<Spec> {
     pub fn new(state: Spec::State, manager: Spec, tree_policy: Spec::TreePolicy, eval: Spec::Eval,
-            table: Spec::TranspositionTable) -> Self {
+               table: Spec::TranspositionTable) -> Self {
         let arena = Box::new(Arena::new());
         let root_node = create_node(&eval, &tree_policy, &state, CreationHelper::Allocator(&arena.allocator()));
         Self {
@@ -328,14 +329,14 @@ impl<Spec: MCTS> SearchTree<Spec> {
             let choice = match self.manager.override_policy(&playout_data, &state, node.moves()) {
                 Some(choice) => choice,
                 None => self.tree_policy.choose_child(&state, node.moves(), self.make_handle(tld, &node_path)),
-            }; 
+            };
             self.manager.on_choice_made(&mut playout_data, &state, node.moves(), choice, self.make_handle(tld, &node_path));
             choice.hot.down(&self.manager);
             players.push(state.current_player());
             path.push(choice);
             assert!(path.len() <= self.manager.max_playout_length(),
-                "playout length exceeded maximum of {} (maybe the transposition table is creating an infinite loop?)",
-                self.manager.max_playout_length());
+                    "playout length exceeded maximum of {} (maybe the transposition table is creating an infinite loop?)",
+                    self.manager.max_playout_length());
             state.make_move(&choice.cold.mov);
             let (new_node, new_did_we_create) = self.descend(&state, choice.cold, tld, &node_path);
             node = new_node;
@@ -356,9 +357,9 @@ impl<Spec: MCTS> SearchTree<Spec> {
             node_path.push(node);
             node.down(&self.manager);
             if node.get_visits().load(Ordering::Relaxed) as u64
-                    <= self.manager.visits_before_expansion() {
-                break;
-            }
+                <= self.manager.visits_before_expansion() {
+                    break;
+                }
         }
         let new_evaln = if did_we_create {
             None
@@ -371,8 +372,8 @@ impl<Spec: MCTS> SearchTree<Spec> {
     }
 
     fn descend<'a>(&'a self, state: &Spec::State, choice: &ColdMoveInfo<Spec>,
-            tld: &mut ThreadData<'a, Spec>, path: &[&'a SearchNode<Spec>])
-            -> (&'a SearchNode<Spec>, bool) {
+                   tld: &mut ThreadData<'a, Spec>, path: &[&'a SearchNode<Spec>])
+                   -> (&'a SearchNode<Spec>, bool) {
         let child = choice.child.load(Ordering::Relaxed) as *const _;
         if child != null() {
             return unsafe { (&*child, false) };
@@ -390,7 +391,7 @@ impl<Spec: MCTS> SearchTree<Spec> {
             }
         }
         let created_here = create_node(&self.eval, &self.tree_policy, state,
-            CreationHelper::Handle(self.make_handle(tld, path)));
+                                       CreationHelper::Handle(self.make_handle(tld, path)));
         let created = tld.allocator.alloc_one();
         *created = created_here;
         let other_child = choice.child.compare_and_swap(
@@ -415,28 +416,31 @@ impl<Spec: MCTS> SearchTree<Spec> {
     }
 
     fn finish_playout<'a>(&'a self,
-            path: &[MoveInfoHandle<Spec>],
-            node_path: &[&'a SearchNode<Spec>],
-            players: &[Player<Spec>],
-            tld: &mut ThreadData<'a, Spec>,
-            evaln: &StateEvaluation<Spec>) {
-        for ((move_info, player), node) in
-                path.iter()
-                .zip(players.iter())
-                .zip(node_path.iter())
-                .rev() {
-            let evaln_value = self.eval.interpret_evaluation_for_player(evaln, player);
-            node.up(&self.manager, evaln_value);
-            move_info.hot.replace(*node);
-            self.manager.on_backpropagation(
-                &evaln,
-                self.make_handle(tld, node_path));
-        }
-        self.manager.on_backpropagation(&evaln, self.make_handle(tld, node_path));
+                          path: &[MoveInfoHandle<Spec>],
+                          node_path: &[&'a SearchNode<Spec>],
+                          players: &[Player<Spec>],
+                          tld: &mut ThreadData<'a, Spec>,
+                          evaln: &StateEvaluation<Spec>) {
+        path.iter()
+            .zip(players.iter())
+            .zip(node_path.iter())
+            .enumerate()
+            .rev()
+            .for_each(|(index, ((move_info, player), node))| {
+                let node_path = &node_path[..(index + 1)];
+                assert!((*node) as *const SearchNode<Spec> ==
+                        node_path[node_path.len() - 1] as *const SearchNode<Spec>);
+                let evaln_value = self.eval.interpret_evaluation_for_player(evaln, player);
+                node.up(&self.manager, evaln_value);
+                move_info.hot.replace(*node);
+                self.eval.on_backpropagation(
+                    &evaln,
+                    self.make_handle(tld, node_path));
+            });
     }
 
     fn make_handle<'a, 'b>(&'a self, tld: &'b mut ThreadData<'a, Spec>, path: &'b [&'a SearchNode<Spec>])
-            -> SearchHandle<'a, 'b, Spec> {
+                           -> SearchHandle<'a, 'b, Spec> {
         let shared = SharedSearchHandle {tree: self, path};
         SearchHandle {shared, tld}
     }

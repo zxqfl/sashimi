@@ -33,7 +33,7 @@ impl MCTS for GooseMCTS {
     type State = State;
     type Eval = GooseEval;
     type TreePolicy = AlphaGoPolicy;
-    type NodeData = ();
+    type NodeData = NodeData;
     type ExtraThreadData = ThreadSentinel;
     type TranspositionTable = ApproxTable<Self>;
     type PlayoutData = ();
@@ -45,7 +45,7 @@ impl MCTS for GooseMCTS {
         SCALE as i64
     }
     fn cycle_behaviour(&self) -> CycleBehaviour<Self> {
-        CycleBehaviour::UseThisEvalWhenCycleDetected(0)
+        CycleBehaviour::UseThisEvalWhenCycleDetected(Evaluation::draw())
     }
 }
 
@@ -54,17 +54,23 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn create_manager(state: State, model: Model) -> MCTSManager<GooseMCTS> {
+    pub fn create_manager(state: State,
+                          model: Model,
+                          lr: SpecificModel)
+                          -> MCTSManager<GooseMCTS> {
         MCTSManager::new(
             state.freeze(),
             GooseMCTS,
-            GooseEval::from(model),
+            GooseEval::new(model, lr),
             policy(),
             ApproxTable::enough_to_hold(GooseMCTS.node_limit()))
     }
-    pub fn new(state: State) -> Self {
-        let search = Self::create_manager(state, Model::default()).into();
+    pub fn new(state: State, lr: SpecificModel) -> Self {
+        let search = Self::create_manager(state, Model::default(), lr).into();
         Self {search}
+    }
+    pub fn into_specific_model(self) -> SpecificModel {
+        self.search.halt().into_eval().into_specific_model()
     }
     fn stop_and_print_m(self) -> MCTSManager<GooseMCTS> {
         if self.search.num_threads() == 0 {

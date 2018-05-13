@@ -1,5 +1,3 @@
-const DEFAULT_LEARNING_RATE: f64 = 1e-3;
-
 #[cfg(test)]
 mod tests;
 
@@ -9,10 +7,10 @@ pub struct LinearRegression {
 }
 
 impl LinearRegression {
-    pub fn new(num_predictors: usize) -> Self {
+    pub fn new(num_predictors: usize, learning_rate: f64) -> Self {
         Self {
             coef: vec![0.0; num_predictors],
-            learning_rate: DEFAULT_LEARNING_RATE,
+            learning_rate,
         }
     }
 

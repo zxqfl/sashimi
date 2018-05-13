@@ -60,8 +60,8 @@
 //!
 //!     fn evaluate_new_state(&self, state: &CountingGame, moves: &Vec<Move>,
 //!         _: Option<SearchHandle<MyMCTS>>)
-//!         -> (Vec<()>, i64) {
-//!         (vec![(); moves.len()], state.0)
+//!         -> (Vec<()>, i64, ()) {
+//!         (vec![(); moves.len()], state.0, ())
 //!     }
 //!     fn interpret_evaluation_for_player(&self, evaln: &i64, _player: &()) -> i64 {
 //!         *evaln
@@ -125,12 +125,13 @@ use atomics::*;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use pod::Pod;
 
 pub trait MCTS: Sized + Sync {
     type State: GameState + Sync;
     type Eval: Evaluator<Self>;
     type TreePolicy: TreePolicy<Self>;
-    type NodeData: Default + Sync + Send;
+    type NodeData: Sync + Send + Pod;
     type TranspositionTable: TranspositionTable<Self>;
     type ExtraThreadData;
     type PlayoutData: Default;
@@ -159,8 +160,6 @@ pub trait MCTS: Sized + Sync {
     fn max_playout_length(&self) -> usize {
         1_000_000
     }
-    /// Called when a playout is complete. The default implementation does nothing.
-    fn on_backpropagation(&self, _evaln: &StateEvaluation<Self>, _handle: SearchHandle<Self>) {}
     fn cycle_behaviour(&self) -> CycleBehaviour<Self> {
         if std::mem::size_of::<Self::TranspositionTable>() == 0 {
             CycleBehaviour::Ignore
@@ -222,7 +221,9 @@ pub trait Evaluator<Spec: MCTS>: Sync {
     fn evaluate_new_state(&self,
                           state: &Spec::State, moves: &MoveList<Spec>,
                           handle: Option<SearchHandle<Spec>>)
-                          -> (Vec<MoveEvaluation<Spec>>, Self::StateEvaluation);
+                          -> (Vec<MoveEvaluation<Spec>>,
+                              Self::StateEvaluation,
+                              Spec::NodeData);
 
     fn evaluate_existing_state(&self, state: &Spec::State, existing_evaln: &Self::StateEvaluation,
                                handle: SearchHandle<Spec>)
@@ -231,6 +232,9 @@ pub trait Evaluator<Spec: MCTS>: Sync {
     fn interpret_evaluation_for_player(&self,
                                        evaluation: &Self::StateEvaluation,
                                        player: &Player<Spec>) -> i64;
+
+    /// Called when a playout is complete. The default implementation does nothing.
+    fn on_backpropagation(&self, _evaln: &StateEvaluation<Spec>, _handle: SearchHandle<Spec>) {}
 }
 
 
@@ -396,6 +400,10 @@ where
             search_tree: self.search_tree.reset(),
             print_on_playout_error: self.print_on_playout_error,
         }
+    }
+
+    pub fn into_eval(self) -> Spec::Eval {
+        self.search_tree.eval
     }
 }
 

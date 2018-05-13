@@ -74,28 +74,29 @@ impl GameResult {
 }
 
 impl FeatureVec {
-    pub fn write_libsvm<W: Write, Pred: Fn(usize) -> bool>
-        (&mut self, mut f: W, label: usize, whitelist: Pred) {
-            write!(f, "{}", label).unwrap();
-            for (index, value) in self.arr.iter().enumerate() {
-                if *value != 0 && whitelist(index) {
-                    write!(f, " {}:{}", index + 1, value).unwrap();
-                }
+    pub fn write_libsvm<W: Write, Pred: Fn(usize) -> bool>(
+        &mut self, mut f: W, label: usize, whitelist: Pred) {
+        write!(f, "{}", label).unwrap();
+        for (index, value) in self.arr.iter().enumerate() {
+            if *value != 0 && whitelist(index) {
+                write!(f, " {}:{}", index + 1, value).unwrap();
             }
-            self.patterns.sort();
-            let mut cnt = 0;
-            for i in 0..self.patterns.len() {
-                let x = self.patterns[i];
-                cnt += 1;
-                if i + 1 == self.patterns.len() || x != self.patterns[i + 1] {
-                    if whitelist(x) {
-                        write!(f, " {}:{}", x + 1, cnt).unwrap();
-                    }
-                    cnt = 0;
-                }
-            }
-            write!(f, "\n").unwrap();
         }
+        self.patterns.sort();
+        let mut cnt = 0;
+        for i in 0..self.patterns.len() {
+            let x = self.patterns[i];
+            cnt += 1;
+            if i + 1 == self.patterns.len() || x != self.patterns[i + 1] {
+                if whitelist(x) {
+                    write!(f, " {}:{}", x + 1, cnt).unwrap();
+                }
+                cnt = 0;
+            }
+        }
+        write!(f, "\n").unwrap();
+    }
+
     pub fn write_frequency(&self, freq: &mut [u64; NUM_FEATURES]) {
         for (index, &value) in self.arr.iter().enumerate() {
             freq[index] += value as u64;
@@ -103,6 +104,14 @@ impl FeatureVec {
         for &x in &self.patterns {
             freq[x] += 1;
         }
+    }
+
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item=(usize, f64)> + Clone + 'a {
+        self.arr.iter()
+            .map(|x| *x as f64)
+            .enumerate()
+            .chain(self.patterns.iter()
+                   .map(|index| (*index, 1.0)))
     }
 }
 
@@ -240,7 +249,15 @@ fn foreach_feature<F>(state: &State, _: &[ChessMove], mut f: F) where F: FnMut(u
     }
 }
 
-pub fn featurize(state: &State, moves: &[ChessMove]) -> FeatureVec {
+pub enum WhichFeatures {
+    AllFeatures,
+    OnlyDenseFeatures,
+}
+
+pub fn featurize(state: &State,
+                 moves: &[ChessMove],
+                 which_features: WhichFeatures)
+                 -> FeatureVec {
     let mut arr = [0u8; NUM_DENSE_FEATURES];
     let mut patterns = Vec::with_capacity(MAX_PATTERNS_IN_POSITION);
     foreach_feature(state, moves, |i, v| {
@@ -249,7 +266,10 @@ pub fn featurize(state: &State, moves: &[ChessMove]) -> FeatureVec {
         if i < NUM_DENSE_FEATURES {
             arr[i] += v;
         } else {
-            patterns.push(i as usize);
+            match which_features {
+                WhichFeatures::AllFeatures => patterns.push(i as usize),
+                WhichFeatures::OnlyDenseFeatures => (),
+            }
         }
     });
     assert!(patterns.len() <= MAX_PATTERNS_IN_POSITION);
@@ -259,13 +279,21 @@ pub fn featurize(state: &State, moves: &[ChessMove]) -> FeatureVec {
     }
 }
 
-pub fn predict(state: &State, moves: &[ChessMove], model: &Model) -> [f32; NUM_OUTCOMES] {
+pub fn predict(state: &State,
+               moves: &[ChessMove],
+               generic_model: &Model,
+               specific_model: &LinearRegression)
+               -> ([f32; NUM_OUTCOMES], f32) {
     let mut result = [0f32; NUM_OUTCOMES];
+    let mut specific_result = 0.0;
     foreach_feature(state, moves, |i, _| {
         if i < NUM_MODEL_FEATURES {
             for j in 0..NUM_OUTCOMES {
-                result[j] += model.value_coef[i][j];
+                result[j] += generic_model.value_coef[i][j];
             }
+        }
+        if i < specific_model.coef().len() {
+            specific_result += specific_model.coef()[i];
         }
     });
     for x in &mut result {
@@ -277,13 +305,21 @@ pub fn predict(state: &State, moves: &[ChessMove], model: &Model) -> [f32; NUM_O
     }
     if state.board().side_to_move() == Color::Black {
         result.swap(0, 1);
+        specific_result = -specific_result;
     }
-    result
+    (result, specific_result as f32)
 }
-pub fn score(state: &State, moves: &[ChessMove], model: &Model) -> f32 {
-    let probs = predict(state, moves, model);
-    probs[GameResult::WhiteWin as usize]
-        - probs[GameResult::BlackWin as usize]
+
+pub fn score(state: &State,
+             moves: &[ChessMove],
+             generic_model: &Model,
+             specific_model: &LinearRegression)
+             -> (f32, f32) {
+    let (probs, specific) = predict(state, moves, generic_model, specific_model);
+    let generic =
+        probs[GameResult::WhiteWin as usize]
+        - probs[GameResult::BlackWin as usize];
+    (generic, specific)
 }
 
 fn phase(s: &State) -> Phase {

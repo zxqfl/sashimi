@@ -9,6 +9,7 @@ slurp = "*"
 
 [dependencies]
 mcts = { path = "../mcts" }
+linear_regression = { path = "../linear_regression" }
 chess = "*"
 float-ord = "*"
 rand = "*"
@@ -18,3 +19,4 @@ log = "*"
 serde_json = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
+pod = "0.5.0"

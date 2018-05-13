@@ -4,13 +4,14 @@ use state::State;
 use std::sync::mpsc::{SendError, channel};
 use std::thread;
 use engine;
+use engine::evaluation::SpecificModel;
 
 const ENGINE_NAME: &'static str = "Sashimi";
 const ENGINE_AUTHOR: &'static str = "Jacob Jackson";
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
 pub fn main(commands: Vec<String>) {
-    let mut search = Search::new(State::default());
+    let mut search = Search::new(State::default(), SpecificModel::new());
     let mut position_num: u64 = 0;
     let (sender, receiver) = channel();
     for cmd in commands {
@@ -40,7 +41,7 @@ pub fn main(commands: Vec<String>) {
                     position_num += 1;
                     if let Some(state) = State::from_tokens(tokens) {
                         debug!("\n{}", state.board());
-                        search = Search::new(state);
+                        search = Search::new(state, search.into_specific_model());
                     } else {
                         error!("Couldn't parse '{}' as position", line);
                     }

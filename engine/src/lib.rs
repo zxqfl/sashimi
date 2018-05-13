@@ -7,6 +7,9 @@ extern crate smallvec;
 extern crate shakmaty;
 extern crate chess;
 extern crate mcts;
+extern crate linear_regression;
+extern crate pod;
+extern crate rand;
 
 mod import;
 pub mod model;

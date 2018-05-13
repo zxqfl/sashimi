@@ -51,8 +51,8 @@ impl Evaluator<MyMCTS> for MyEvaluator {
 
     fn evaluate_new_state(&self, state: &CountingGame, moves: &Vec<Move>,
                           _: Option<SearchHandle<MyMCTS>>)
-                          -> (Vec<()>, i64) {
-        (vec![(); moves.len()], state.0)
+                          -> (Vec<()>, i64, ()) {
+        (vec![(); moves.len()], state.0, ())
     }
 
     fn interpret_evaluation_for_player(&self, evaln: &i64, _player: &()) -> i64 {

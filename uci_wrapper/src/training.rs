@@ -12,7 +12,8 @@ use state::StateBuilder;
 use shakmaty;
 use chess;
 use mcts::GameState;
-use features::{GameResult, featurize, NUM_DENSE_FEATURES, NUM_FEATURES, name_feature};
+use features::{GameResult, featurize, NUM_DENSE_FEATURES, NUM_FEATURES, name_feature,
+               WhichFeatures};
 use policy_features;
 use policy_features::NUM_POLICY_FEATURES;
 
@@ -79,7 +80,7 @@ impl<'pgn> Visitor<'pgn> for ValueDataGenerator {
         for (i, m) in moves.into_iter().enumerate() {
             if i >= 2 && self.rng.gen_range(0., 1.) < freq {
                 let moves = state.available_moves();
-                let mut f = featurize(&state, moves.as_slice());
+                let mut f = featurize(&state, moves.as_slice(), WhichFeatures::AllFeatures);
                 self.rows_written += 1;
                 if let Some(out_file) = self.out_file.as_mut() {
                     let whitelist = &self.whitelist;

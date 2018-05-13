@@ -1,43 +1,163 @@
 use import::*;
 
-pub struct GooseEval {
-    model: Model
+const LEARNING_RATE: f64 = 1e-3;
+
+struct PastEvaluation {
+    feature_vec: FeatureVec,
+    value: i64,
+    color: Color,
 }
 
-impl Evaluator<GooseMCTS> for GooseEval {
-    type StateEvaluation = i64;
+pub struct GooseEval {
+    generic_model: Model,
+    specific_model: Mutex<SpecificModel>,
+    past_evaluations: Mutex<Vec<Box<PastEvaluation>>>,
+}
 
-    fn evaluate_new_state(&self, state: &State, moves: &MoveList,
-                          _: Option<SearchHandle<GooseMCTS>>) -> (Vec<f32>, i64) {
-        let move_evaluations = evaluate_moves(state, moves.as_slice(), &self.model);
-        let state_evaluation = if moves.len() == 0 {
-            let x = SCALE as i64;
-            match state.outcome() {
-                BoardStatus::Stalemate => 0,
-                BoardStatus::Checkmate =>
-                    if state.board().side_to_move() == Color::White {-x} else {x},
-                BoardStatus::Ongoing => unreachable!(),
-            }
-        } else {
-            (features::score(state, moves.as_slice(), &self.model) * SCALE as f32) as i64
-        };
-        (move_evaluations, state_evaluation)
+pub struct NodeData(*const PastEvaluation);
+
+unsafe impl Pod for NodeData {}
+unsafe impl Send for NodeData {}
+unsafe impl Sync for NodeData {}
+
+pub struct SpecificModel([LinearRegression; 2]);
+
+impl SpecificModel {
+    pub fn new() -> Self {
+        SpecificModel([
+            LinearRegression::new(features::NUM_DENSE_FEATURES, LEARNING_RATE),
+            LinearRegression::new(features::NUM_DENSE_FEATURES, LEARNING_RATE)])
     }
-    fn evaluate_existing_state(&self, _: &State, evaln: &i64,
-                               _: SearchHandle<GooseMCTS>) -> i64 {
-        *evaln
+
+    fn model_for(&mut self, c: Color) -> &mut LinearRegression {
+        &mut self.0[c as usize]
     }
-    fn interpret_evaluation_for_player(&self, evaln: &i64, player: &Player) -> i64 {
-        match *player {
-            Color::White => *evaln,
-            Color::Black => -*evaln,
+}
+
+#[derive(Clone, Copy)]
+pub struct Evaluation {
+    generic_evaluation_for_white: i64,
+    specific_evaluation_for_white: i64,
+}
+
+impl Evaluation {
+    pub fn draw() -> Self {
+        Self {
+            generic_evaluation_for_white: 0,
+            specific_evaluation_for_white: 0,
         }
     }
 }
 
-impl From<Model> for GooseEval {
-    fn from(m: Model) -> Self {
-        Self {model: m}
+fn quantize(x: f32) -> i64 {
+    (x * SCALE) as i64
+}
+fn unquantize(x: i64) -> f64 {
+    x as f64 * (1.0 / SCALE as f64)
+}
+
+impl Evaluator<GooseMCTS> for GooseEval {
+    type StateEvaluation = Evaluation;
+
+    fn evaluate_new_state(&self,
+                          state: &State,
+                          moves: &MoveList,
+                          _handle: Option<SearchHandle<GooseMCTS>>)
+                          -> (Vec<f32>, Evaluation, NodeData) {
+        let move_evaluations = evaluate_moves(state, moves.as_slice(), &self.generic_model);
+        let (state_evaluation, node_data) = if moves.len() == 0 {
+            let scale = SCALE as i64;
+            let generic = match state.outcome() {
+                BoardStatus::Stalemate => 0,
+                BoardStatus::Checkmate => {
+                    if state.board().side_to_move() == Color::White {
+                        -scale
+                    } else {
+                        scale
+                    }
+                }
+                BoardStatus::Ongoing => unreachable!(),
+            };
+            (Evaluation {
+                generic_evaluation_for_white: generic,
+                specific_evaluation_for_white: 0,
+            },
+             null())
+        } else {
+            let (generic, specific) = features::score(
+                state, moves.as_slice(),
+                &self.generic_model,
+                &self.specific_model.lock()
+                    .expect("lock model")
+                    .model_for(state.board().side_to_move()));
+            let past_evaluation = PastEvaluation {
+                feature_vec: features::featurize(state,
+                                                 moves.as_slice(),
+                                                 WhichFeatures::OnlyDenseFeatures),
+                value: quantize(generic),
+                color: state.board().side_to_move(),
+            };
+            let past_evaluation = Box::new(past_evaluation);
+            let node_data = &*past_evaluation as *const PastEvaluation;
+            self.past_evaluations.lock()
+                .expect("lock past_evaluations")
+                .push(past_evaluation);
+            (Evaluation {
+                generic_evaluation_for_white: quantize(generic),
+                specific_evaluation_for_white: quantize(specific),
+            },
+             node_data)
+        };
+        (move_evaluations, state_evaluation, NodeData(node_data))
+    }
+
+    fn evaluate_existing_state(&self, _: &State, evaln: &Evaluation,
+                               _: SearchHandle<GooseMCTS>) -> Evaluation {
+        *evaln
+    }
+
+    fn interpret_evaluation_for_player(&self, evaln: &Evaluation, player: &Player) -> i64 {
+        let evaln = evaln.generic_evaluation_for_white + evaln.specific_evaluation_for_white;
+        match *player {
+            Color::White => evaln,
+            Color::Black => -evaln,
+        }
+    }
+
+    fn on_backpropagation(&self,
+                          evaln: &Evaluation,
+                          handle: SearchHandle<GooseMCTS>) {
+        if rand::thread_rng().gen_range(0, 16) != 0 {
+            return;
+        }
+        let data = handle.node().data().0;
+        if data != null() {
+            let past_evaluation = unsafe { &*data };
+            let mut specific_model = self.specific_model.lock().unwrap();
+            let residual = evaln.generic_evaluation_for_white - past_evaluation.value;
+            let residual = match past_evaluation.color {
+                Color::White => residual,
+                Color::Black => -residual,
+            };
+            specific_model.model_for(past_evaluation.color)
+                .update_coefficients(past_evaluation.feature_vec.iter(),
+                                     unquantize(residual));
+        }
+    }
+}
+
+impl GooseEval {
+    pub fn new(generic_model: Model, specific_model: SpecificModel) -> Self {
+        let specific_model = Mutex::new(specific_model);
+        Self {
+            generic_model,
+            specific_model,
+            past_evaluations: Vec::new().into(),
+        }
+    }
+
+    pub fn into_specific_model(self) -> SpecificModel {
+        self.specific_model.into_inner().unwrap()
     }
 }
 
@@ -59,7 +179,9 @@ mod tests {
         for (a, b) in paired {
             println!("policy: {} {}", a, b);
         }
-        let mut manager = Search::create_manager(state, Model::default());
+        let mut manager = Search::create_manager(state,
+                                                 Model::default(),
+                                                 SpecificModel::new());
         // for _ in 0..5 {
         manager.playout_n(1_000_000);
         println!("\n\nMOVES");
@@ -82,7 +204,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(debug_assertions))]
     fn mate_in_one() {
         assert_find_move("6k1/8/6K1/8/8/8/8/R7 w - - 0 0", "a1-a8");;
     }

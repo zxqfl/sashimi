@@ -152,8 +152,10 @@ version = "0.2.0"
 dependencies = [
  "chess 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "float-ord 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "linear_regression 0.1.0",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "mcts 0.2.0",
+ "pod 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.53 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -554,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "uci_wrapper"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chess 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -565,7 +567,7 @@ dependencies = [
  "memmap 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pgn-reader 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "shakmaty 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "simplelog 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "slurp 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
