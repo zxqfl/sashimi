@@ -88,12 +88,12 @@ mod tests {
 
     #[test]
     fn mate_in_one() {
-        assert_find_move("6k1/8/6K1/8/8/8/8/R7 w - - 0 0", "a1-a8");;
+        assert_find_move("6k1/8/6K1/8/8/8/8/R7 w - - 0 0", "a1a8");;
     }
 
     #[test]
     fn mate_in_six() {
-        assert_find_move("5q2/6Pk/8/6K1/8/8/8/8 w - - 0 0", "g7-f8=R");
+        assert_find_move("5q2/6Pk/8/6K1/8/8/8/8 w - - 0 0", "g7f8r");
     }
 
     #[test]
